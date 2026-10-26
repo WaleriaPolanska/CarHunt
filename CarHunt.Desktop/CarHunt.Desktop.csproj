@@ -1,0 +1,41 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!--If you are willing to use platform-specific APIs, use conditional compilation.
+    See https://docs.avaloniaui.net/docs/guides/platforms/platform-specific-code/dotnet for more details.-->
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="AvaloniaUI.DiagnosticsSupport" >
+      <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
+      <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CarHunt\CarHunt.csproj" />
+  </ItemGroup>
+
+  <!--
+    Avalonia 12.0.3 ships native macOS libraries (libAvaloniaNative, and SkiaSharp/HarfBuzz
+    from a preview package) that are signed with a Developer ID but not notarized. macOS
+    refuses to load them into the process ("library load disallowed by system policy"),
+    so the app crashes on startup. Re-signing them ad-hoc locally makes them loadable.
+  -->
+  <Target Name="AdHocSignNativeLibs" AfterTargets="Build"
+          Condition="$([MSBuild]::IsOSPlatform('OSX'))">
+    <ItemGroup>
+      <NativeLibToSign Include="$(OutputPath)runtimes/osx*/native/*.dylib" />
+    </ItemGroup>
+    <Exec Command="codesign --force --sign - &quot;%(NativeLibToSign.FullPath)&quot;"
+          Condition="'@(NativeLibToSign)' != ''"
+          ContinueOnError="true" StandardOutputImportance="low" />
+  </Target>
+</Project>

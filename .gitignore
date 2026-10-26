@@ -1,0 +1,17 @@
+# сборка
+bin/
+obj/
+.vs/
+.idea/
+
+# личные настройки IDE
+*.user
+*.suo
+
+# секреты - в репозиторий не попадают никогда
+*.keystore
+*.jks
+google-services.json
+testers.csv
+
+.DS_Store

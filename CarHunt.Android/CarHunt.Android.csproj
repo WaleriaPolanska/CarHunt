@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- The API level is spelled out: without it the command line infers a default but
+         Rider's restore does not, and fails with NU1012. 36 is what the installed
+         workload targets. -->
+    <TargetFramework>net10.0-android36.0</TargetFramework>
+    <!-- 24 (Android 7), because the ads library and androidx.webkit both refuse to build
+         against anything lower. Android 6 is a fraction of a percent of devices. -->
+    <SupportedOSPlatformVersion>24</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ApplicationId>com.carhunt.app</ApplicationId>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <!-- Google Play only accepts App Bundles; APK is kept for local debug deploys. -->
+    <AndroidPackageFormat Condition="'$(Configuration)' == 'Release'">aab</AndroidPackageFormat>
+    <AndroidPackageFormat Condition="'$(Configuration)' != 'Release'">apk</AndroidPackageFormat>
+    <!-- Release ships arm64 only. x86_64 exists for Intel emulators; every phone on the
+         Play Store is arm64, and Play already hands each device just its own slice — so
+         dropping it halves the bundle and changes nothing for the user. Debug keeps both
+         so an Intel machine can still run the emulator. -->
+    <RuntimeIdentifiers Condition="'$(Configuration)' == 'Release'">android-arm64</RuntimeIdentifiers>
+    <!-- Profiled AOT compiles what actually runs during startup rather than everything,
+         which is smaller for the same launch time. -->
+    <AndroidEnableProfiledAot Condition="'$(Configuration)' == 'Release'">true</AndroidEnableProfiledAot>
+    <AndroidEnableProfiledAot Condition="'$(Configuration)' != 'Release'">false</AndroidEnableProfiledAot>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AndroidResource Include="Icon.png">
+      <Link>Resources\drawable\Icon.png</Link>
+    </AndroidResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Android" />
+    <PackageReference Include="Xamarin.AndroidX.Core.SplashScreen" />
+    <PackageReference Include="Xamarin.GooglePlayServices.Ads" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CarHunt\CarHunt.csproj" />
+  </ItemGroup>
+</Project>

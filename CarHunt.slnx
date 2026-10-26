@@ -1,0 +1,8 @@
+﻿<Solution>
+  <Project Path="CarHunt.Android/CarHunt.Android.csproj">
+    <Deploy />
+  </Project>
+  <Project Path="CarHunt.Browser/CarHunt.Browser.csproj" />
+  <Project Path="CarHunt.Desktop/CarHunt.Desktop.csproj" />
+  <Project Path="CarHunt/CarHunt.csproj" />
+</Solution>

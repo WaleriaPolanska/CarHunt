@@ -1,0 +1,68 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:CarHunt.ViewModels"
+             xmlns:converters="using:CarHunt.Converters"
+             x:Class="CarHunt.Views.SortField"
+             x:DataType="vm:MainViewModel">
+  <UserControl.Resources>
+    <converters:SortSelectionConverter x:Key="SortIs"/>
+  </UserControl.Resources>
+
+  <!-- The field is a dropdown; its flyout holds one frame per category. Inside a frame
+       the two directions exclude each other, and ticking the chosen one again empties
+       that category. The categories are independent, so one option from each can be
+       active at the same time.
+
+       Written once and used above both lists: the two copies it replaces were identical
+       but for a name and a visibility binding, so a change to one had to be repeated by
+       hand in the other. -->
+  <Button Classes="sort-header" x:Name="Field"
+          HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Cursor="Hand">
+    <Button.RenderTransform><ScaleTransform/></Button.RenderTransform>
+    <TextBlock Text="{Binding SortSummary}" VerticalAlignment="Center"
+               HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+    <Button.Flyout>
+      <Flyout Placement="Bottom">
+        <StackPanel Spacing="6" MinWidth="330">
+          <Border Classes="sort-group">
+            <Grid ColumnDefinitions="Auto,*,*" ColumnSpacing="6">
+              <TextBlock Grid.Column="0" Text="Price" Classes="sort-label"/>
+              <CheckBox Grid.Column="1" Classes="sort-option" Content="Low first"
+                        IsChecked="{Binding PriceSort, Converter={StaticResource SortIs}, ConverterParameter='Cheapest first', Mode=OneWay}"
+                        Command="{Binding SetSortCommand}" CommandParameter="Cheapest first"/>
+              <CheckBox Grid.Column="2" Classes="sort-option" Content="High first"
+                        IsChecked="{Binding PriceSort, Converter={StaticResource SortIs}, ConverterParameter='Most expensive first', Mode=OneWay}"
+                        Command="{Binding SetSortCommand}" CommandParameter="Most expensive first"/>
+            </Grid>
+          </Border>
+          <Border Classes="sort-group">
+            <Grid ColumnDefinitions="Auto,*,*" ColumnSpacing="6">
+              <TextBlock Grid.Column="0" Text="Mileage" Classes="sort-label"/>
+              <CheckBox Grid.Column="1" Classes="sort-option" Content="Low first"
+                        IsChecked="{Binding MileageSort, Converter={StaticResource SortIs}, ConverterParameter='Lowest mileage', Mode=OneWay}"
+                        Command="{Binding SetSortCommand}" CommandParameter="Lowest mileage"/>
+              <CheckBox Grid.Column="2" Classes="sort-option" Content="High first"
+                        IsChecked="{Binding MileageSort, Converter={StaticResource SortIs}, ConverterParameter='Highest mileage', Mode=OneWay}"
+                        Command="{Binding SetSortCommand}" CommandParameter="Highest mileage"/>
+            </Grid>
+          </Border>
+          <Border Classes="sort-group">
+            <Grid ColumnDefinitions="Auto,*,*" ColumnSpacing="6">
+              <!-- Worth knowing behind this label: Motogratka publishes no listing date and
+                   offers no ordering of its own, so the four sites cannot be placed on one
+                   timeline. Each is ordered by its own idea of recency and the lists are
+                   then interleaved, so no single site takes over the top of the list. -->
+              <TextBlock Grid.Column="0" Text="Date" Classes="sort-label"/>
+              <CheckBox Grid.Column="1" Classes="sort-option" Content="Newest"
+                        IsChecked="{Binding DateSort, Converter={StaticResource SortIs}, ConverterParameter='Newest', Mode=OneWay}"
+                        Command="{Binding SetSortCommand}" CommandParameter="Newest"/>
+              <CheckBox Grid.Column="2" Classes="sort-option" Content="Oldest"
+                        IsChecked="{Binding DateSort, Converter={StaticResource SortIs}, ConverterParameter='Oldest', Mode=OneWay}"
+                        Command="{Binding SetSortCommand}" CommandParameter="Oldest"/>
+            </Grid>
+          </Border>
+        </StackPanel>
+      </Flyout>
+    </Button.Flyout>
+  </Button>
+</UserControl>

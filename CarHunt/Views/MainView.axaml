@@ -1,0 +1,860 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:CarHunt.ViewModels"
+             xmlns:asyncImageLoader="using:AsyncImageLoader"
+             xmlns:views="using:CarHunt.Views"
+             xmlns:models="using:CarHunt.Models"
+             xmlns:webview="clr-namespace:Avalonia.Controls;assembly=Avalonia.Controls.WebView"
+             mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="800"
+             x:Class="CarHunt.Views.MainView"
+             x:Name="Root"
+             x:DataType="vm:MainViewModel"
+             Background="#111111">
+  <Design.DataContext>
+    <vm:MainViewModel />
+  </Design.DataContext>
+
+  <UserControl.Resources>
+  <!-- One card for both lists. The two copies it replaces differed only in
+       colours, while the heart already says whether a listing is saved. -->
+  <DataTemplate x:Key="CarCard" x:DataType="models:Car">
+  <Grid>
+    <Button Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).OpenCarCommand}" CommandParameter="{Binding}" Background="Transparent" Padding="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Cursor="Hand">
+      <Border Background="White" CornerRadius="10" Padding="12" BorderBrush="#C8E6E0" BorderThickness="1">
+        <Grid ColumnDefinitions="80,*" ColumnSpacing="10">
+          <Border Grid.Column="0" CornerRadius="8" ClipToBounds="True" Height="60" Width="80" Background="#E8F5F2">
+            <Image asyncImageLoader:ImageLoader.Source="{Binding ImageUrl}" Stretch="UniformToFill"/>
+          </Border>
+          <StackPanel Grid.Column="1" Spacing="2" Margin="0,0,28,0">
+            <TextBlock Text="{Binding TranslatedTitle}" FontWeight="Bold" Foreground="#1A2F2B" TextTrimming="CharacterEllipsis"/>
+            <TextBlock Text="{Binding Title}" FontSize="11" Foreground="#7BAFA5" TextTrimming="CharacterEllipsis"/>
+            <StackPanel Orientation="Horizontal" Spacing="12">
+              <TextBlock Text="{Binding PriceDisplay}" Foreground="#3A9E8C" FontWeight="Bold"/>
+              <TextBlock Text="{Binding OriginalPriceDisplay}" FontSize="11" Foreground="#7BAFA5" VerticalAlignment="Center"
+                         IsVisible="{Binding OriginalPriceDisplay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+              <TextBlock Text="{Binding YearDisplay}" Foreground="#5A8A80"/>
+              <TextBlock Text="{Binding Mileage, StringFormat='{}{0:N0} km'}" Foreground="#5A8A80"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="{Binding Source}" FontSize="10" Foreground="#3A9E8C"/>
+              <TextBlock Text="{Binding Country}" FontSize="10" Foreground="#7BAFA5"/>
+            </StackPanel>
+          </StackPanel>
+        </Grid>
+      </Border>
+    </Button>
+    <Button Classes="fav-toggle"
+            Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).ToggleFavoriteCommand}"
+            CommandParameter="{Binding}"
+            ToolTip.Tip="Add to Favorites"
+            HorizontalAlignment="Right" VerticalAlignment="Top">
+      <Panel>
+        <TextBlock Text="&#x2661;" FontSize="20" Foreground="#C76A63" IsVisible="{Binding !IsFavorite}"/>
+        <TextBlock Text="&#x2665;" FontSize="20" Foreground="#E8423A" IsVisible="{Binding IsFavorite}"/>
+      </Panel>
+    </Button>
+  </Grid>
+  </DataTemplate>
+    <FontFamily x:Key="Lobster">avares://CarHunt/Assets/Lobster-Regular.ttf#Lobster</FontFamily>
+    <SolidColorBrush x:Key="FilterTextBrush">#3A9E8C</SolidColorBrush>
+    <!-- Explicit rather than the theme's placeholder colour: the fields are hard-coded
+         light, so a system dark theme would paint the hint white and invisible. -->
+    <SolidColorBrush x:Key="FilterPlaceholderBrush">#7BAFA5</SolidColorBrush>
+  </UserControl.Resources>
+
+  <UserControl.Styles>
+    <!-- The list is a container, not a control: the card draws itself, so the box brings
+         no background, no border and no selection highlight. -->
+    <Style Selector="ListBox.results">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Padding" Value="0"/>
+    </Style>
+    <Style Selector="ListBox.results > ListBoxItem">
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Margin" Value="0,0,0,8"/>
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="ListBox.results > ListBoxItem:selected /template/ ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="ListBox.results > ListBoxItem:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+    <Style Selector="Image.wheel-spin">
+      <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
+      <Setter Property="RenderTransform" Value="rotate(0)"/>
+      <Style.Animations>
+        <Animation Duration="0:0:6" IterationCount="INFINITE" Easing="LinearEasing">
+          <KeyFrame Cue="100%"><Setter Property="RotateTransform.Angle" Value="360"/></KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
+    <Style Selector="Image.car-fly">
+      <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
+      <Style.Animations>
+        <Animation Duration="0:0:1.2" IterationCount="INFINITE" Easing="LinearEasing">
+          <KeyFrame Cue="0%">
+            <Setter Property="TranslateTransform.X" Value="-230"/>
+            <Setter Property="TranslateTransform.Y" Value="1.5"/>
+          </KeyFrame>
+          <KeyFrame Cue="50%">
+            <Setter Property="TranslateTransform.X" Value="0"/>
+            <Setter Property="TranslateTransform.Y" Value="0"/>
+          </KeyFrame>
+          <KeyFrame Cue="100%">
+            <Setter Property="TranslateTransform.X" Value="230"/>
+            <Setter Property="TranslateTransform.Y" Value="1.5"/>
+          </KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
+    <Style Selector="Border.cloud-float-a">
+      <Setter Property="Opacity" Value="0.55"/>
+      <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
+      <Style.Animations>
+        <Animation Duration="0:0:16" IterationCount="INFINITE" Easing="LinearEasing">
+          <KeyFrame Cue="0%"><Setter Property="TranslateTransform.X" Value="-110"/></KeyFrame>
+          <KeyFrame Cue="100%"><Setter Property="TranslateTransform.X" Value="170"/></KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
+    <Style Selector="Border.cloud-float-b">
+      <Setter Property="Opacity" Value="0.45"/>
+      <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
+      <Style.Animations>
+        <Animation Duration="0:0:20" IterationCount="INFINITE" Easing="LinearEasing">
+          <KeyFrame Cue="0%"><Setter Property="TranslateTransform.X" Value="-130"/></KeyFrame>
+          <KeyFrame Cue="100%"><Setter Property="TranslateTransform.X" Value="190"/></KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
+    <Style Selector="TextBox.filter-field">
+      <!-- The Fluent default is 10,6,6,5, which leaves a visibly wider gap on the left
+           than on the right. Set both sides the same. -->
+      <Setter Property="Padding" Value="10,5"/>
+      <Setter Property="Background" Value="#EEF8F6"/>
+      <Setter Property="BorderBrush" Value="#B8DDD6"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Foreground" Value="{StaticResource FilterTextBrush}"/>
+      <Setter Property="FontFamily" Value="{StaticResource Lobster}"/>
+      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="FontWeight" Value="Bold"/>
+      <Setter Property="PlaceholderForeground" Value="{StaticResource FilterTextBrush}"/>
+    </Style>
+    <Style Selector="TextBox.filter-field:focus">
+      <Setter Property="Background" Value="#EEF8F6"/>
+      <Setter Property="Foreground" Value="#3A9E8C"/>
+    </Style>
+    <Style Selector="TextBox.filter-field:pressed">
+      <Setter Property="Background" Value="#EEF8F6"/>
+      <Setter Property="Foreground" Value="#3A9E8C"/>
+    </Style>
+    <!-- The placeholder part is named PART_Placeholder in Avalonia 12; the old
+         PART_WatermarkPresenter name matched nothing, so these hints silently fell
+         back to the system theme colour. -->
+    <Style Selector="TextBox.filter-field /template/ TextBlock#PART_Placeholder">
+      <Setter Property="Foreground" Value="{StaticResource FilterPlaceholderBrush}"/>
+      <Setter Property="FontFamily" Value="{StaticResource Lobster}"/>
+      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="FontWeight" Value="Normal"/>
+      <Setter Property="Opacity" Value="1"/>
+      <Setter Property="FontStyle" Value="Normal"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+    
+    
+    <Style Selector="ComboBox.filter-field">
+      <Setter Property="Padding" Value="10,5"/>
+      <Setter Property="Background" Value="#EEF8F6"/>
+      <Setter Property="BorderBrush" Value="#B8DDD6"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Foreground" Value="{StaticResource FilterTextBrush}"/>
+      <!-- Muted until the user picks something, matching the still-empty text fields. -->
+      <Setter Property="PlaceholderForeground" Value="{StaticResource FilterPlaceholderBrush}"/>
+      <Setter Property="FontFamily" Value="{StaticResource Lobster}"/>
+      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="FontWeight" Value="Normal"/>
+    </Style>
+    <!-- This presenter wraps the placeholder as well, so weight is set further down
+         instead of here, otherwise the placeholder renders bold too. -->
+    <Style Selector="ComboBox.filter-field /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Foreground" Value="{StaticResource FilterTextBrush}"/>
+    </Style>
+    <Style Selector="ComboBox.filter-field /template/ TextBlock#PlaceholderTextBlock">
+      <Setter Property="FontWeight" Value="Normal"/>
+    </Style>
+    <!-- A chosen option turns bold — including "Doesn't matter". -->
+    <Style Selector="ComboBox.filter-field /template/ ContentControl#ContentPresenter">
+      <Setter Property="Foreground" Value="{StaticResource FilterTextBrush}"/>
+      <Setter Property="FontWeight" Value="Bold"/>
+    </Style>
+    <Style Selector="ComboBox.filter-field ComboBoxItem">
+      <Setter Property="Foreground" Value="#3A9E8C"/>
+    </Style>
+    <Style Selector="ComboBox.filter-field ComboBoxItem:pointerover">
+      <Setter Property="Foreground" Value="#3A9E8C"/>
+    </Style>
+    <Style Selector="ComboBox.filter-field ComboBoxItem:selected">
+      <Setter Property="Foreground" Value="#3A9E8C"/>
+    </Style>
+    <!-- Sort category frames: the same footprint as the text fields above them, with
+         white and green swapped — green plate, white lettering. -->
+    <Style Selector="Border.sort-group">
+      <Setter Property="Background" Value="#3A9E8C"/>
+      <Setter Property="BorderBrush" Value="#2F8273"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="6"/>
+      <Setter Property="Padding" Value="8,0"/>
+      <Setter Property="MinHeight" Value="32"/>
+    </Style>
+    <Style Selector="TextBlock.sort-label">
+      <Setter Property="Foreground" Value="White"/>
+      <Setter Property="FontFamily" Value="{StaticResource Lobster}"/>
+      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="FontWeight" Value="Bold"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+      <Setter Property="Width" Value="66"/>
+    </Style>
+
+    <!-- The tick box itself is dropped: the pill shows the state, and a box next to a
+         box reads as a list rather than one choice with two directions. -->
+    <Style Selector="CheckBox.sort-option /template/ Border#NormalRectangle">
+      <Setter Property="IsVisible" Value="False"/>
+    </Style>
+    <Style Selector="CheckBox.sort-option /template/ Path#CheckGlyph">
+      <Setter Property="IsVisible" Value="False"/>
+    </Style>
+    <Style Selector="CheckBox.sort-option /template/ Border#PART_Border">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="#111111"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="6"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="MinWidth" Value="0"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="Background" Duration="0:0:0.12"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <!-- The label sits in the content presenter, so centring has to be set there as
+         well as on the control, or it stays left-aligned inside the pill. -->
+    <Style Selector="CheckBox.sort-option /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="VerticalAlignment" Value="Stretch"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="TextElement.Foreground" Value="White"/>
+      <Setter Property="TextBlock.TextAlignment" Value="Center"/>
+      <Setter Property="Padding" Value="6,3"/>
+      <Setter Property="Margin" Value="0"/>
+    </Style>
+    <!-- Deliberately not the Lobster face used elsewhere: it is a script font whose
+         glyphs lean and overrun the line box the layout measures, so at this size the
+         labels looked slanted and shaved off. An upright face measures honestly. -->
+    <Style Selector="CheckBox.sort-option">
+      <Setter Property="Foreground" Value="White"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="MinWidth" Value="0"/>
+      <Setter Property="MinHeight" Value="26"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="VerticalAlignment" Value="Stretch"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="CheckBox.sort-option:pointerover /template/ Border#PART_Border">
+      <Setter Property="Background" Value="#4FB9A5"/>
+    </Style>
+    <!-- Chosen option inverts again: white plate, green lettering. -->
+    <Style Selector="CheckBox.sort-option:checked /template/ Border#PART_Border">
+      <Setter Property="Background" Value="White"/>
+      <Setter Property="BorderBrush" Value="#111111"/>
+    </Style>
+    <Style Selector="CheckBox.sort-option:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="TextElement.Foreground" Value="#3A9E8C"/>
+      <Setter Property="TextElement.FontWeight" Value="Bold"/>
+    </Style>
+
+    <!-- Browser back: inverted against its green header — white plate, green lettering —
+         so it reads as a button. Set on the presenter, since that is what the theme
+         paints; colours put on the button itself were being overridden and lost. -->
+    <Style Selector="Button.browser-back /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="White"/>
+      <Setter Property="BorderBrush" Value="White"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="TextElement.Foreground" Value="#3A9E8C"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="Background" Duration="0:0:0.15"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button.browser-back:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#111111"/>
+      <Setter Property="BorderBrush" Value="White"/>
+      <Setter Property="TextElement.Foreground" Value="White"/>
+    </Style>
+    <Style Selector="Button.browser-back:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#1F1F1F"/>
+      <Setter Property="BorderBrush" Value="White"/>
+      <Setter Property="TextElement.Foreground" Value="White"/>
+    </Style>
+
+    <!-- Collapsed sort field: green plate, white lettering, sized like the fields above. -->
+    <Style Selector="Button.sort-header">
+      <Setter Property="FontFamily" Value="{StaticResource Lobster}"/>
+      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="FontWeight" Value="Bold"/>
+      <Setter Property="Padding" Value="10,0"/>
+      <Setter Property="MinHeight" Value="34"/>
+      <Setter Property="CornerRadius" Value="6"/>
+    </Style>
+    <Style Selector="Button.sort-header /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#3A9E8C"/>
+      <Setter Property="BorderBrush" Value="#2F8273"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="TextElement.Foreground" Value="White"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="Background" Duration="0:0:0.15"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button.sort-header:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#2F8273"/>
+      <Setter Property="TextElement.Foreground" Value="White"/>
+    </Style>
+    <Style Selector="Button.sort-header:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#276B5F"/>
+      <Setter Property="TextElement.Foreground" Value="White"/>
+    </Style>
+
+    <Style Selector="CheckBox.filter-field">
+      <Setter Property="Foreground" Value="#3A9E8C"/>
+      <Setter Property="FontFamily" Value="{StaticResource Lobster}"/>
+      <Setter Property="FontSize" Value="13"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="TextBlock.LetterSpacing" Value="0.5"/>
+      <Style.Resources>
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUnchecked">#FFFFFF</SolidColorBrush>
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUncheckedPointerOver">#FFFFFF</SolidColorBrush>
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUncheckedPressed">#FFFFFF</SolidColorBrush>
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked">#FFFFFF</SolidColorBrush>
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver">#FFFFFF</SolidColorBrush>
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPressed">#FFFFFF</SolidColorBrush>
+        <SolidColorBrush x:Key="CheckBoxCheckBorderBrushUnchecked">#3A9E8C</SolidColorBrush>
+        <SolidColorBrush x:Key="CheckBoxCheckBorderBrushUncheckedPointerOver">#3A9E8C</SolidColorBrush>
+        <SolidColorBrush x:Key="CheckBoxCheckBorderBrushUncheckedPressed">#3A9E8C</SolidColorBrush>
+        <SolidColorBrush x:Key="CheckBoxCheckBorderBrushChecked">#3A9E8C</SolidColorBrush>
+        <SolidColorBrush x:Key="CheckBoxCheckBorderBrushCheckedPointerOver">#3A9E8C</SolidColorBrush>
+        <SolidColorBrush x:Key="CheckBoxCheckBorderBrushCheckedPressed">#3A9E8C</SolidColorBrush>
+        <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked">#3A9E8C</SolidColorBrush>
+        <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver">#3A9E8C</SolidColorBrush>
+        <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPressed">#3A9E8C</SolidColorBrush>
+      </Style.Resources>
+    </Style>
+    <Style Selector="CheckBox.filter-field /template/ Border#NormalRectangle">
+      <Setter Property="Background" Value="#FFFFFF"/>
+      <Setter Property="BorderBrush" Value="#111111"/>
+    </Style>
+    <Style Selector="CheckBox.filter-field:checked /template/ Border#NormalRectangle">
+      <Setter Property="Background" Value="#111111"/>
+      <Setter Property="BorderBrush" Value="#FFFFFF"/>
+    </Style>
+    <Style Selector="CheckBox.filter-field:checked /template/ Path#CheckGlyph">
+      <Setter Property="Fill" Value="#FFFFFF"/>
+    </Style>
+    <Style Selector="Button.spaced-button">
+      <Setter Property="TextBlock.LetterSpacing" Value="2"/>
+      <!-- The dip itself is animated from code-behind on PointerPressed; a ":pressed"
+           transition never finishes, because a click leaves that state almost at once. -->
+      <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
+    </Style>
+
+    <!-- Search: hover flips the fill and the text, instead of the theme's washed-out
+         translucent overlay. The presenter is what the theme paints, so it is set there. -->
+    <Style Selector="Button.search-button /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#3A9E8C"/>
+      <Setter Property="BorderBrush" Value="#3A9E8C"/>
+      <Setter Property="BorderThickness" Value="2"/>
+      <Setter Property="TextElement.Foreground" Value="White"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="Background" Duration="0:0:0.15"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button.search-button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="White"/>
+      <Setter Property="BorderBrush" Value="#3A9E8C"/>
+      <Setter Property="TextElement.Foreground" Value="#3A9E8C"/>
+    </Style>
+    <Style Selector="Button.search-button:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#2F8273"/>
+      <Setter Property="BorderBrush" Value="#2F8273"/>
+      <Setter Property="TextElement.Foreground" Value="White"/>
+    </Style>
+
+    <!-- Share: same white/black/green rotation as the notepad it sits under. -->
+    <Style Selector="Button.share-button /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="White"/>
+      <Setter Property="BorderBrush" Value="#111111"/>
+      <Setter Property="BorderThickness" Value="2"/>
+      <Setter Property="TextElement.Foreground" Value="#3A9E8C"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="Background" Duration="0:0:0.15"/>
+          <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button.share-button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#3A9E8C"/>
+      <Setter Property="BorderBrush" Value="White"/>
+      <Setter Property="TextElement.Foreground" Value="#111111"/>
+    </Style>
+    <Style Selector="Button.share-button:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#2F8273"/>
+      <Setter Property="BorderBrush" Value="White"/>
+      <Setter Property="TextElement.Foreground" Value="#111111"/>
+    </Style>
+
+    <!-- Show N more: the Share button's colours turned inside out, so it reads as the
+         one thing on screen asking to be pressed rather than as another plain control. -->
+    <Style Selector="Button.pending-button /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#3A9E8C"/>
+      <Setter Property="BorderBrush" Value="#111111"/>
+      <Setter Property="BorderThickness" Value="2"/>
+      <Setter Property="TextElement.Foreground" Value="White"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="Background" Duration="0:0:0.15"/>
+          <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button.pending-button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="White"/>
+      <Setter Property="BorderBrush" Value="#3A9E8C"/>
+      <Setter Property="TextElement.Foreground" Value="#3A9E8C"/>
+    </Style>
+    <Style Selector="Button.pending-button:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#E6F4F1"/>
+      <Setter Property="BorderBrush" Value="#2F8273"/>
+      <Setter Property="TextElement.Foreground" Value="#2F8273"/>
+    </Style>
+
+    <!-- Favorites notepad. The theme's own hover tint is suppressed on the presenter; the
+         pad itself inverts to black instead, so the paper reads as flipped rather than
+         merely shaded. Green stays green — it carries on both black and white. -->
+    <Style Selector="Button.my-ads /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.my-ads:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.my-ads:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+    <Style Selector="Button.my-ads Border.pad-surface">
+      <Setter Property="Background" Value="White"/>
+      <Setter Property="BorderBrush" Value="#111111"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="Background" Duration="0:0:0.15"/>
+          <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button.my-ads Border.pad-ring">
+      <Setter Property="Background" Value="#111111"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="Background" Duration="0:0:0.15"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button.my-ads Border.pad-line">
+      <Setter Property="Background" Value="#CBD8D4"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="Background" Duration="0:0:0.15"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button.my-ads TextBlock.pad-title">
+      <Setter Property="Foreground" Value="#3A9E8C"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="Foreground" Duration="0:0:0.15"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button.my-ads Path.pen-ink">
+      <Setter Property="Fill" Value="#111111"/>
+    </Style>
+    <Style Selector="Button.my-ads Path.pen-body">
+      <Setter Property="Fill" Value="#3A9E8C"/>
+      <Setter Property="Stroke" Value="#111111"/>
+    </Style>
+
+    <!-- Hover rotates the palette rather than merely darkening it:
+         white paper becomes green, black ink becomes white, green becomes black. -->
+    <Style Selector="Button.my-ads:pointerover Border.pad-surface">
+      <Setter Property="Background" Value="#3A9E8C"/>
+      <Setter Property="BorderBrush" Value="White"/>
+    </Style>
+    <Style Selector="Button.my-ads:pointerover Border.pad-line">
+      <Setter Property="Background" Value="#111111"/>
+    </Style>
+    <Style Selector="Button.my-ads:pointerover Border.pad-ring">
+      <Setter Property="Background" Value="White"/>
+    </Style>
+    <Style Selector="Button.my-ads:pointerover TextBlock.pad-title">
+      <Setter Property="Foreground" Value="#111111"/>
+    </Style>
+    <Style Selector="Button.my-ads:pointerover Path.pen-ink">
+      <Setter Property="Fill" Value="White"/>
+    </Style>
+    <Style Selector="Button.my-ads:pointerover Path.pen-body">
+      <Setter Property="Fill" Value="#111111"/>
+      <Setter Property="Stroke" Value="White"/>
+    </Style>
+
+    <Style Selector="Button.my-ads:pressed Border.pad-surface">
+      <Setter Property="Background" Value="#2F8273"/>
+      <Setter Property="BorderBrush" Value="White"/>
+    </Style>
+    <Style Selector="Button.my-ads:pressed Border.pad-line">
+      <Setter Property="Background" Value="#111111"/>
+    </Style>
+    <Style Selector="Button.my-ads:pressed Border.pad-ring">
+      <Setter Property="Background" Value="White"/>
+    </Style>
+    <Style Selector="Button.my-ads:pressed TextBlock.pad-title">
+      <Setter Property="Foreground" Value="#111111"/>
+    </Style>
+    <Style Selector="Button.my-ads:pressed Path.pen-ink">
+      <Setter Property="Fill" Value="White"/>
+    </Style>
+    <Style Selector="Button.my-ads:pressed Path.pen-body">
+      <Setter Property="Fill" Value="#111111"/>
+      <Setter Property="Stroke" Value="White"/>
+    </Style>
+
+    <Style Selector="Button.fav-toggle">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Padding" Value="6,2"/>
+      <Setter Property="Margin" Value="0,2,4,0"/>
+      <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Button.fav-toggle:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.fav-toggle:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+    
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="*,Auto">
+  <Border Grid.RowSpan="2" Background="#111111"/>
+  <Grid Grid.RowSpan="2" IsHitTestVisible="False" Opacity="0.72" HorizontalAlignment="Center" VerticalAlignment="Stretch" ColumnDefinitions="Auto,24,Auto" Margin="0,0,0,0">
+    <Border Grid.Column="0" Width="18" Background="#F2F2F2" CornerRadius="7"/>
+    <Border Grid.Column="2" Width="18" Background="#F2F2F2" CornerRadius="7"/>
+  </Grid>
+  <ScrollViewer x:Name="MainScroll" Padding="{Binding ScrollPadding}">
+    <StackPanel Margin="0" Spacing="0">
+      <!-- Top sky header with clouds behind the logo/text -->
+      <Border Background="#D8F1F4" CornerRadius="0" HorizontalAlignment="Stretch" ClipToBounds="True" Margin="0">
+        <Grid Height="140">
+          <Border Width="122" Height="32" CornerRadius="18" Background="#EEFFFFFF" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8,12,0,0" Classes="cloud-float-a">
+            <Border.RenderTransform><TranslateTransform/></Border.RenderTransform>
+          </Border>
+          <Border Width="86" Height="24" CornerRadius="14" Background="#E6FFFFFF" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="150,34,0,0" Classes="cloud-float-b">
+            <Border.RenderTransform><TranslateTransform/></Border.RenderTransform>
+          </Border>
+          <Border Width="110" Height="30" CornerRadius="16" Background="#E6FFFFFF" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,22,18,0" Classes="cloud-float-a">
+            <Border.RenderTransform><TranslateTransform/></Border.RenderTransform>
+          </Border>
+          <Border Width="98" Height="28" CornerRadius="15" Background="#EAFFFFFF" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="36,0,0,14" Classes="cloud-float-b">
+            <Border.RenderTransform><TranslateTransform/></Border.RenderTransform>
+          </Border>
+          <Border Width="118" Height="30" CornerRadius="16" Background="#E6FFFFFF" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,52,10" Classes="cloud-float-a">
+            <Border.RenderTransform><TranslateTransform/></Border.RenderTransform>
+          </Border>
+
+          <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="4">
+            <Button Click="OnLogoClick" Cursor="Hand" Background="Transparent" BorderThickness="0" Padding="8,6" HorizontalAlignment="Center" HorizontalContentAlignment="Center">
+              <StackPanel Orientation="Vertical" HorizontalAlignment="Center" Spacing="2">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="0">
+                  <TextBlock Text="Car" FontSize="38" FontFamily="{StaticResource Lobster}" Foreground="#3A9E8C" VerticalAlignment="Center"/>
+                  <Image Source="avares://CarHunt/Assets/wheel.png" Width="36" Height="36" VerticalAlignment="Center" Margin="4,0" Classes="wheel-spin">
+                    <Image.RenderTransform><RotateTransform/></Image.RenderTransform>
+                  </Image>
+                  <TextBlock Text="Hunt" FontSize="38" FontFamily="{StaticResource Lobster}" Foreground="#3A9E8C" VerticalAlignment="Center"/>
+                </StackPanel>
+              </StackPanel>
+            </Button>
+
+
+            <TextBlock Text="Find your perfect car" FontSize="16" FontFamily="{StaticResource Lobster}" FontWeight="Light" Foreground="#6EAAA0" HorizontalAlignment="Center"/>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <StackPanel Margin="16" Spacing="12">
+
+      <!-- Search Parameters -->
+      <Border Background="#C1CDD3" CornerRadius="12" Padding="16" BorderBrush="#A9BCC2" BorderThickness="1">
+        <StackPanel Spacing="10">
+          <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8" ColumnSpacing="8">
+            <TextBox Grid.Row="0" Grid.Column="0" Text="{Binding Brand}" PlaceholderText="Brand (e.g. BMW)" Classes="filter-field" />
+            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Model}" PlaceholderText="Model (e.g. 3 Series)" Classes="filter-field" />
+            <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding YearFrom}" PlaceholderText="Year from" Classes="filter-field" />
+            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding YearTo}" PlaceholderText="Year to" Classes="filter-field" />
+            <TextBox Grid.Row="2" Grid.Column="0" Text="{Binding PriceFrom}" PlaceholderText="Price from &#x20AC;" Classes="filter-field" />
+            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding PriceTo}" PlaceholderText="Price to &#x20AC;" Classes="filter-field" />
+            <TextBox Grid.Row="3" Grid.Column="0" Text="{Binding MileageTo}" PlaceholderText="Max mileage km" Classes="filter-field" />
+            <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding FuelTypes}" SelectedItem="{Binding FuelType}" PlaceholderText="Fuel type" HorizontalAlignment="Stretch" Classes="filter-field"/>
+          </Grid>
+
+
+          <!-- Sources -->
+          <WrapPanel Orientation="Horizontal" ItemHeight="28" ItemWidth="118" HorizontalAlignment="Stretch">
+            <CheckBox Content="AutoScout24" IsChecked="{Binding SearchAutoScout24}" Classes="filter-field"/>
+            <CheckBox Content="OtoMoto" IsChecked="{Binding SearchOtoMoto}" Classes="filter-field"/>
+            <CheckBox Content="Kleinanzeigen" IsChecked="{Binding SearchKleinanzeigen}" Classes="filter-field"/>
+            <CheckBox Content="Motogratka" IsChecked="{Binding SearchMotogratka}" Classes="filter-field"/>
+          </WrapPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- Search Button -->
+      <Button Content="&#x1F50D;  Search" Command="{Binding SearchCommand}" FontSize="16" FontWeight="Bold" FontFamily="{StaticResource Lobster}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="14" CornerRadius="10" Cursor="Hand" Classes="spaced-button search-button" x:Name="SearchButton">
+        <Button.RenderTransform><ScaleTransform/></Button.RenderTransform>
+      </Button>
+
+      <!-- Sits with the search results it orders. Kept on screen in both views: the
+           sort choice is shared with the saved list anyway, and hiding it shifted
+           everything below, which at the top of the page has no scroll to absorb it. -->
+      <views:SortField/>
+
+      <!-- Favorites: a ruled notepad the width of Search and twice its height, so the saved
+           listings read as a notebook. Drawn from shapes rather than an emoji or bitmap,
+           so it stretches to any width and stays sharp at any screen density. -->
+      <Button Command="{Binding ToggleFavoritesCommand}" ToolTip.Tip="Favorites — listings you saved"
+              Background="Transparent" BorderThickness="0" Padding="0"
+              Height="104" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+              Cursor="Hand" Classes="spaced-button my-ads" x:Name="FavoritesButton">
+        <Button.RenderTransform><ScaleTransform/></Button.RenderTransform>
+        <!-- Colours live in the styles, not here: a local value outranks a style setter
+             in Avalonia, which would stop the hover state from repainting the pad. -->
+        <Border Classes="pad-surface" BorderThickness="2" CornerRadius="10">
+          <Grid RowDefinitions="Auto,*" Margin="16,10,14,12">
+            <!-- spiral binding -->
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="16">
+              <Border Classes="pad-ring" Width="3" Height="13" CornerRadius="2"/>
+              <Border Classes="pad-ring" Width="3" Height="13" CornerRadius="2"/>
+              <Border Classes="pad-ring" Width="3" Height="13" CornerRadius="2"/>
+              <Border Classes="pad-ring" Width="3" Height="13" CornerRadius="2"/>
+              <Border Classes="pad-ring" Width="3" Height="13" CornerRadius="2"/>
+              <Border Classes="pad-ring" Width="3" Height="13" CornerRadius="2"/>
+            </StackPanel>
+
+            <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="10">
+              <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="7">
+                <TextBlock Classes="pad-title" Text="Favorites" FontFamily="{StaticResource Lobster}" FontSize="19"
+                           FontWeight="Bold"/>
+                <Border Classes="pad-line" Height="2" CornerRadius="1"/>
+                <Border Classes="pad-line" Height="2" CornerRadius="1"
+                        HorizontalAlignment="Left" Width="130"/>
+              </StackPanel>
+
+              <!-- pen writing on the pad -->
+              <Viewbox Grid.Column="1" Width="42" Height="42" VerticalAlignment="Center">
+                <Canvas Width="24" Height="24">
+                  <Path Classes="pen-ink"
+                        Data="M21.3,7.4 L19.6,5.7 A1.05,1.05 0 0 0 18.1,5.7 L17,6.8 L20.2,10 L21.3,8.9 A1.05,1.05 0 0 0 21.3,7.4 Z"/>
+                  <Path Classes="pen-body"
+                        Data="M16.2,7.6 L10,13.8 L9.1,17.9 L13.2,17 L19.4,10.8 Z"
+                        StrokeThickness="0.9"/>
+                  <Path Classes="pen-ink" Data="M9.1,17.9 L10.9,17.5 L9.5,16.1 Z"/>
+                </Canvas>
+              </Viewbox>
+            </Grid>
+          </Grid>
+        </Border>
+      </Button>
+
+
+      <!-- Results -->
+        <!-- Both lists live in a panel that never falls below one screen tall. Swapping a
+           long list for a short one otherwise shrinks the page under the current scroll
+           position, and the clamp that follows is what threw the view around. -->
+      <StackPanel Spacing="8">
+
+      <!-- Sorting for the results, kept beside the list it orders. Above the
+           notepad its hiding shortened the page and dragged everything with it.
+           The field is a dropdown; its flyout holds one frame per category.
+             Inside a frame the two directions exclude each other, and ticking the
+             chosen one again empties that category. The categories are independent,
+             so one option from each can be active at the same time. -->
+
+      <!-- A ListBox, because it is the one list here that virtualises: it builds cards
+           only for what fits the screen. A search now walks every page a site publishes,
+           and with the plain panel that was here before, four thousand listings meant
+           four thousand cards and images built at once — measured on the emulator at
+           3.3 GB and still climbing, where a phone would have killed the app long before.
+
+           It is one screen tall and scrolls inside itself; that viewport is what tells
+           the list which cards are needed. The saved list below is left as it was — it
+           holds what one person picked out by hand, not a market. -->
+      <ListBox x:Name="ResultsList" ItemsSource="{Binding Results}"
+               IsVisible="{Binding ShowResultsList}"
+               Classes="results"
+               ItemTemplate="{StaticResource CarCard}"
+               Height="{Binding #MainScroll.Bounds.Height}"/>
+
+      <!-- Favorites -->
+      <Button Content="{Binding ShareLabel}" Click="OnShareFavorites"
+              IsVisible="{Binding ShowFavorites}"
+              FontFamily="{StaticResource Lobster}" FontSize="14" FontWeight="Bold"
+              HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+              Padding="12,9" CornerRadius="8" Cursor="Hand"
+              Classes="spaced-button share-button" x:Name="ShareButton">
+        <Button.RenderTransform><ScaleTransform/></Button.RenderTransform>
+      </Button>
+
+      <!-- The saved list answers to the same choice, sorted in memory rather than by
+           searching again. Sits under Share so it only appears with the list it orders. -->
+
+      <!-- The saved listings sit on a translucent brand-green plate, so the list the
+           user built for themselves reads as one block rather than as loose cards. -->
+      <!-- Native ad among the saved listings. An experiment: every other attempt to put
+           an ad inside the page killed the app, but this list is short and its rows are
+           not recycled. If it proves unstable, delete this block — nothing depends on it. -->
+      <Border Background="#141414" CornerRadius="8" Height="250" Margin="0,4"
+              IsVisible="{Binding ShowFavoritesAd}">
+        <views:AdSlot Slot="10"/>
+      </Border>
+
+      <Border Background="#B33A9E8C" CornerRadius="10" Padding="8"
+              IsVisible="{Binding ShowFavorites}">
+        <ItemsControl ItemsSource="{Binding Favorites}"
+                      ItemTemplate="{StaticResource CarCard}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel Spacing="8"/></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+        </ItemsControl>
+      </Border>
+      </StackPanel>
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
+
+  <!-- Pages that arrived while the reader was looking wait behind this. Merging them in is
+       the one moment the list is allowed to reorder itself, so the reader starts it.
+       It has a row of its own under the scrolling page rather than floating over it: laid
+       over the list it stayed put but hid whichever card scrolled beneath it. -->
+  <Button Grid.Row="1" Content="{Binding PendingLabel}" Command="{Binding ShowPendingCommand}"
+          Click="OnShowPendingClick"
+          IsVisible="{Binding HasPending}"
+          Margin="{Binding PendingButtonMargin}"
+          FontFamily="{StaticResource Lobster}" FontSize="14" FontWeight="Bold"
+          HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+          Padding="12,9" CornerRadius="8" Cursor="Hand"
+          Classes="spaced-button pending-button" x:Name="PendingButton">
+    <Button.RenderTransform><ScaleTransform/></Button.RenderTransform>
+  </Button>
+
+  <!-- Loading Overlay with flying car -->
+  <Border Grid.RowSpan="2" Background="#E0F5F9F8" IsVisible="{Binding IsLoading}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+    <!-- No ad here. A banner over the loading screen was tried and killed the app within
+         seconds of a search: this overlay appears and disappears every time, and an ad
+         view attached and detached that way does not survive it. -->
+    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="12">
+      <Border Width="380" Height="180" Background="#D8F1F4" BorderBrush="#66C8DED8" BorderThickness="1" CornerRadius="12" ClipToBounds="True">
+        <Grid>
+          <Border Height="84" Background="#111111" CornerRadius="0" VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Margin="0">
+            <Grid>
+              <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="8,0">
+                <Border Width="18" Height="4" Background="#F3F3F3" CornerRadius="2"/>
+                <Border Width="18" Height="4" Background="#F3F3F3" CornerRadius="2"/>
+                <Border Width="18" Height="4" Background="#F3F3F3" CornerRadius="2"/>
+                <Border Width="18" Height="4" Background="#F3F3F3" CornerRadius="2"/>
+                <Border Width="18" Height="4" Background="#F3F3F3" CornerRadius="2"/>
+                <Border Width="18" Height="4" Background="#F3F3F3" CornerRadius="2"/>
+                <Border Width="18" Height="4" Background="#F3F3F3" CornerRadius="2"/>
+                <Border Width="18" Height="4" Background="#F3F3F3" CornerRadius="2"/>
+                <Border Width="18" Height="4" Background="#F3F3F3" CornerRadius="2"/>
+                <Border Width="18" Height="4" Background="#F3F3F3" CornerRadius="2"/>
+                <Border Width="18" Height="4" Background="#F3F3F3" CornerRadius="2"/>
+                <Border Width="18" Height="4" Background="#F3F3F3" CornerRadius="2"/>
+                <Border Width="18" Height="4" Background="#F3F3F3" CornerRadius="2"/>
+                <Border Width="18" Height="4" Background="#F3F3F3" CornerRadius="2"/>
+              </StackPanel>
+            </Grid>
+          </Border>
+          <Image Source="avares://CarHunt/Assets/3d-car-with-simple-background_23-2150797022.png" Width="222" Height="120" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,8" Classes="car-fly">
+            <Image.RenderTransform><TranslateTransform/></Image.RenderTransform>
+          </Image>
+        </Grid>
+      </Border>
+      <TextBlock Text="Searching cars..." FontSize="18" FontFamily="{StaticResource Lobster}"
+                 TextBlock.LetterSpacing="2" Foreground="#3A9E8C" HorizontalAlignment="Center"/>
+    </StackPanel>
+  </Border>
+
+  <!-- Message over the list: no network, a site that did not answer, or a search that
+       genuinely found nothing. It dims the page rather than blocking it, so the results
+       underneath stay readable — the previous ones are often still useful. -->
+  <Border Grid.RowSpan="2" Background="#B4111111" IsVisible="{Binding ShowAlert}"
+          HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+    <Border Background="White" CornerRadius="14" Padding="20,18" Margin="26"
+            MaxWidth="380" HorizontalAlignment="Center" VerticalAlignment="Center"
+            BorderBrush="#3A9E8C" BorderThickness="2">
+      <StackPanel Spacing="12">
+        <TextBlock Text="{Binding AlertTitle}" FontFamily="{StaticResource Lobster}"
+                   FontSize="20" Foreground="#3A9E8C" TextWrapping="Wrap"/>
+        <TextBlock Text="{Binding AlertText}" FontSize="14" Foreground="#111111"
+                   TextWrapping="Wrap" LineHeight="20"/>
+        <Button Content="Got it" Command="{Binding DismissAlertCommand}"
+                Classes="spaced-button share-button" FontFamily="{StaticResource Lobster}"
+                FontSize="15" FontWeight="Bold" Padding="12,8" CornerRadius="8"
+                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Cursor="Hand">
+          <Button.RenderTransform><ScaleTransform/></Button.RenderTransform>
+        </Button>
+      </StackPanel>
+    </Border>
+  </Border>
+
+  <!-- In-app browser: listings open here instead of in the system browser -->
+  <Border Grid.RowSpan="2" Background="#F5F9F8" IsVisible="{Binding ShowBrowser}"
+          HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+    <Grid RowDefinitions="Auto,*">
+      <Border Grid.Row="0" Background="#3A9E8C" Padding="8,6">
+        <Grid ColumnDefinitions="Auto,*">
+          <Button Grid.Column="0" Content="&#x2190;  Back" Command="{Binding CloseBrowserCommand}"
+                  Classes="browser-back" FontFamily="{StaticResource Lobster}" FontSize="14"
+                  FontWeight="Bold" Padding="12,4" CornerRadius="6" Cursor="Hand"/>
+          <TextBlock Grid.Column="1" Text="{Binding BrowserTitle}" Foreground="White"
+                     VerticalAlignment="Center" Margin="8,0,0,0" TextTrimming="CharacterEllipsis"/>
+        </Grid>
+      </Border>
+      <webview:NativeWebView Grid.Row="1" Source="{Binding BrowserUrl}"/>
+    </Grid>
+  </Border>
+  </Grid>
+</UserControl>

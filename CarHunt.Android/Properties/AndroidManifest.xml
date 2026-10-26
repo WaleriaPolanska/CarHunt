@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:installLocation="auto">
+	<uses-permission android:name="android.permission.INTERNET" />
+	<!-- AdMob needs the advertising id to serve anything but the most basic ads; Play
+	     requires it to be declared from Android 13 on. -->
+	<uses-permission android:name="com.google.android.gms.permission.AD_ID" />
+	<application android:label="CarHunt" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round">
+		<!-- The app's own AdMob id. It is the same in debug and release — only the ad
+		     units differ — and it must be right: with a wrong one the SDK refuses to start
+		     and the app dies on launch. -->
+		<meta-data android:name="com.google.android.gms.ads.APPLICATION_ID"
+		           android:value="ca-app-pub-3940256099942544~3347511713" />
+	</application>
+</manifest>
